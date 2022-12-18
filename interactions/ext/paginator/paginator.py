@@ -42,6 +42,7 @@ class ButtonKind(str, Enum):
     INDEX = "index"
     NEXT = "next"
     LAST = "last"
+    DELETE = "delete"
 
 
 class DictSerializerMixin:
@@ -182,6 +183,7 @@ class Paginator(DictSerializerMixin):
         "timeout",
         "author_only",
         "use_buttons",
+        "use_delete_button",
         "use_select",
         "use_index",
         "extended_buttons",
@@ -207,6 +209,7 @@ class Paginator(DictSerializerMixin):
     timeout: Optional[Union[int, float]]
     author_only: bool
     use_buttons: bool
+    use_delete_button: bool
     use_select: bool
     use_index: bool
     extended_buttons: bool
@@ -233,6 +236,7 @@ class Paginator(DictSerializerMixin):
         timeout: Optional[Union[int, float]] = 60,
         author_only: bool = False,
         use_buttons: bool = True,
+        use_delete_button: bool = True,
         use_select: bool = True,
         use_index: bool = False,
         extended_buttons: bool = True,
@@ -248,6 +252,10 @@ class Paginator(DictSerializerMixin):
             raise PaginatorWontWork(
                 "You need either buttons, select, or both, or else the paginator wont work!"
             )
+        if (use_index and use_delete_button):
+            raise PaginatorWontWork(
+                "You need to either enable the delete button or index button exclusively!"
+            )
         if len(pages) < 2:
             raise PaginatorWontWork("You need more than one page!")
         if not all(isinstance(page, Page) for page in pages):
@@ -262,6 +270,7 @@ class Paginator(DictSerializerMixin):
             timeout=timeout,
             author_only=author_only,
             use_buttons=use_buttons,
+            use_delete_button=use_delete_button,
             use_select=use_select,
             use_index=use_index,
             extended_buttons=extended_buttons,
@@ -306,7 +315,10 @@ class Paginator(DictSerializerMixin):
                     return self.data()
                 if result is False:
                     continue
-            await self.component_logic()
+            try:
+                await self.component_logic()
+            except StopPaginator:
+                return self.data()
             self.message = await self.edit()
             if not self.message._client:
                 self.message._client = self.client._http
@@ -329,6 +341,7 @@ class Paginator(DictSerializerMixin):
             f"index{self.id}",
             f"next{self.id}",
             f"last{self.id}",
+            f"delete{self.id}",
         ]
 
     async def component_logic(self) -> None:
@@ -345,6 +358,12 @@ class Paginator(DictSerializerMixin):
             self.index = min(self.index, self.top)
         elif custom_id == f"last{self.id}":
             self.index = self.top
+        elif custom_id == f"delete{self.id}":
+            await self.delete_message()
+            raise StopPaginator("delete button pressed")
+
+    async def delete_message(self):
+        await self.message.delete('delete button pressed')
 
     async def check(self, ctx: ComponentContext) -> bool:
         boolean: bool = True
@@ -393,6 +412,8 @@ class Paginator(DictSerializerMixin):
             self.buttons.get("last", Button(style=1, emoji=Emoji(name="⏭️")))
             if self.extended_buttons
             else None,
+            self.buttons.get("delete", Button(style=4, emoji=Emoji(name="🗑️")))
+            if self.use_delete_button else None
         ]
 
         for i, button in enumerate(buttons):
@@ -400,13 +421,16 @@ class Paginator(DictSerializerMixin):
                 continue
             button.custom_id = self.custom_ids[i + 1]
             button._json.update({"custom_id": button.custom_id})
-            button.disabled = (
-                disabled_left
-                if button.custom_id in self.custom_ids[1:3]
-                else True
-                if button.custom_id == self.custom_ids[3]
-                else disabled_right
-            )
+            if self.use_delete_button and i == len(buttons) - 1:
+                button.disabled = False
+            else:
+                button.disabled = (
+                    disabled_left
+                    if button.custom_id in self.custom_ids[1:3]
+                    else True
+                    if button.custom_id == self.custom_ids[3]
+                    else disabled_right
+                )
             button._json.update({"disabled": button.disabled})
             if button.custom_id == self.custom_ids[3]:
                 button.label = f"{self.placeholder} {self.index + 1}/{self.top + 1}"
