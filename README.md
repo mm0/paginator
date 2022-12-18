@@ -143,7 +143,7 @@ await p.run()
     - To modify this behavior, modify `disable_after_timeout` or `remove_after_timeout`.
 - `?author_only: bool = False`: Whether the paginator should only be used by the author.
 - `?use_buttons: bool = True`: Whether the paginator should use buttons.
-- `?use_delete_button: bool = True`: Whether the paginator include a delete button that deletes the original message.  Cannot be used when `use_index` is enabled.
+- `?use_delete_button: bool = True`: Whether the paginator should include a delete button that deletes the original message.  Cannot be used when `use_index` is enabled.
 - `?use_select: bool = True`: Whether the paginator should use the select menu.
 - `?use_index: bool = False`: Whether the paginator should use the index button.
 - `?extended_buttons: bool = True`: Whether the paginator should use extended buttons.
